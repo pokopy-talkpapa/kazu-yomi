@@ -218,6 +218,16 @@
         if (!best || rank(v.kind) < rank(best.kind)) best = { ...v, said: a };
         if (v.kind === 'match') break;
       }
+      // 候補の中に「百/十/ひゃく/じゅう」などの位の語が含まれていて、
+      // かつどれかの候補の数字が正解と一致 → 正しく位で読めたと判断して○に昇格
+      if (best && !best.ok) {
+        const hasPlace = alts.some(a => /ひゃく|びゃく|ぴゃく|じゅう|百|十/.test(a));
+        const numMatch = alts.some(a => {
+          const d = a.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\D/g, '');
+          return d.length > 0 && parseInt(d, 10) === current;
+        });
+        if (hasPlace && numMatch) best = { ok: true, kind: 'match', raw: best.raw, said: best.said };
+      }
       showResult(best);
     };
     rec.onerror = () => {
