@@ -32,7 +32,7 @@
   }
 
   /* タイトル行 */
-  .titleRow { position:relative; min-height:44px; margin-bottom:8px; }
+  .titleRow { position:relative; min-height:44px; margin-bottom:14px; }
   .title { font-weight:950; font-size:20px; margin:0; text-align:center; line-height:44px; }
   .soundBtn {
     position:absolute; right:0; top:0;
@@ -43,21 +43,11 @@
   }
   .soundBtn.off { background:#e9e9e9; color:#666; }
 
-  /* モードボタン */
-  .topModes { display:flex; justify-content:center; gap:10px; margin:4px 0 14px; }
-  .modeBtn {
-    border:0; border-radius:12px; padding:10px 18px; min-width:110px;
-    font-size:14px; font-weight:900; cursor:pointer;
-    background:#ececec; color:var(--dark);
-    transition:background .12s, color .12s;
-  }
-  .modeBtn.active { background:var(--dark); color:#fff; }
-
   /* 位テーブル */
   table.place { width:100%; border-collapse:collapse; table-layout:fixed; }
   .arrow-row td {
     text-align:center; font-size:1.8rem; line-height:1; height:2rem; padding:0;
-    color:#4a9eff; transition:opacity .15s;
+    color:#4a9eff;
   }
   table.place th {
     font-size:1rem; font-weight:600; padding:6px 0; text-align:center; visibility:hidden;
@@ -80,29 +70,47 @@
   .digit.active { background:var(--hi); }
 
   /* コインエリア */
-  .coins { min-height:38vh; padding-top:8px; }
-  .coins > * { visibility:hidden; }
-  body.hint-on .coins > * { visibility:visible; }
+  .coins { min-height:60px; padding-top:8px; }
+  .coins > * { visibility:hidden; height:0; overflow:hidden; }
+  body.hint-on .coins > * { visibility:visible; height:auto; overflow:visible; }
+  body.hint-on .coins { min-height:30vh; }
   .coinGroup {
     display:flex; gap:4%; justify-content:flex-start; align-items:flex-end;
     height:100%; padding:0 4px;
   }
-  .coinCol {
-    display:flex; flex-direction:column-reverse; align-items:center; gap:4px; flex:0 0 46%;
-  }
+  .coinCol { display:flex; flex-direction:column-reverse; align-items:center; gap:4px; flex:0 0 46%; }
   .coinImg { width:100%; max-width:64px; object-fit:contain; user-select:none; pointer-events:none; }
   .empty { display:flex; align-items:flex-start; justify-content:center; height:100%; padding-top:8px; }
   .empty span { color:#bbb; font-size:.9rem; border:2px dashed #ccc; border-radius:10px; padding:6px 10px; }
 
   /* 結果 */
-  .resultArea { text-align:center; margin-top:10px; min-height:4.5rem; }
-  .result { font-size:2.2rem; font-weight:700; min-height:2.5rem; }
+  .resultArea { text-align:center; margin-top:8px; min-height:3.5rem; }
+  .result { font-size:2.2rem; font-weight:700; min-height:2rem; }
   .result.ok { color:var(--ok); }
   .result.ng { color:var(--ng); }
   .heard { color:#888; font-size:.85rem; min-height:1.2rem; margin-top:2px; }
 
+  /* 聴き取りゲージ */
+  .gauge-wrap {
+    height:6px; border-radius:3px; background:#e8e8e8;
+    margin:10px 12px 0; overflow:hidden; opacity:0;
+    transition:opacity .2s;
+  }
+  .gauge-wrap.visible { opacity:1; }
+  .gauge-bar {
+    height:100%; width:100%; border-radius:3px;
+    background:#4a9eff; transform-origin:left;
+    transform:scaleX(1);
+  }
+  .gauge-bar.running {
+    transition:transform linear;
+  }
+
   /* コントロール */
-  .controls { display:flex; gap:10px; align-items:center; margin-top:14px; flex-wrap:wrap; justify-content:center; }
+  .controls {
+    display:flex; gap:10px; align-items:center; margin-top:14px;
+    flex-wrap:wrap; justify-content:center;
+  }
   .micBtn {
     border:0; border-radius:14px; font-weight:950; cursor:pointer;
     padding:14px 22px; font-size:18px;
@@ -146,11 +154,11 @@
   @media (max-width: 480px) {
     .wrap { padding:6px; }
     .panel { padding:10px 8px 16px; }
-    .titleRow { min-height:36px; }
+    .titleRow { min-height:36px; margin-bottom:10px; }
     .title { font-size:17px; line-height:36px; }
     .soundBtn { font-size:12px; padding:8px 10px; }
     .digit { font-size:3.2rem; }
-    .coins { min-height:32vh; }
+    .coins { min-height:22vh; }
     .micBtn { font-size:16px; padding:12px 18px; min-width:140px; }
   }
 </style>
@@ -164,11 +172,6 @@
         <span id="soundIcon">🔊</span>
         <span id="soundLabel">おと ON</span>
       </button>
-    </div>
-
-    <div class="topModes">
-      <button id="normalModeBtn" class="modeBtn active" type="button">れんしゅう</button>
-      <button id="zeroModeBtn"   class="modeBtn"        type="button">0のれんしゅう</button>
     </div>
 
     <table class="place">
@@ -195,6 +198,11 @@
       <div class="heard"  id="heard"></div>
     </div>
 
+    <!-- 聴き取りゲージ -->
+    <div class="gauge-wrap" id="gaugeWrap">
+      <div class="gauge-bar" id="gaugeBar"></div>
+    </div>
+
     <div class="controls">
       <button id="mic"     class="micBtn"  type="button">🎤 よむ</button>
       <button id="yomanai" class="skipBtn" type="button" style="display:none">読まない ▶</button>
@@ -205,13 +213,17 @@
 
 <script src="judge.js"></script>
 <script>
+  // ===== 定数 =====
+  const LISTEN_TIMEOUT_MS = 5000;   // 認識タイムアウト（ms）
+
   // ===== 状態 =====
-  let current    = 365;
-  let phase      = 0;        // 0=百, 1=十, 2=一
-  let hintActive = false;
+  let current     = 365;
+  let phase       = 0;        // 0=百, 1=十, 2=一
+  let hintActive  = false;
   let recognizing = false;
-  let allowZero  = false;
-  let soundOn    = localStorage.getItem('kazuYomiSoundOn') !== 'off';
+  let soundOn     = localStorage.getItem('kazuYomiSoundOn') !== 'off';
+  let gaugeTimer  = null;
+  let currentRec  = null;     // 現在のSRインスタンス（abort用）
 
   const $ = id => document.getElementById(id);
 
@@ -249,22 +261,39 @@
     osc.connect(amp); amp.connect(ctx.destination);
     osc.start(now); osc.stop(now + dur + 0.02);
   }
-  function playPhaseCorrect() {
-    beep({ freq:660, dur:0.07, gain:0.025 });
-  }
+  function playPhaseCorrect() { beep({ freq:660, dur:0.07, gain:0.025 }); }
   function playVictory() {
     beep({ freq:880,  dur:0.08, gain:0.035, when:0    });
     beep({ freq:1100, dur:0.08, gain:0.03,  when:0.09 });
     beep({ freq:1320, dur:0.12, gain:0.035, when:0.18 });
   }
-  function playWrong() {
-    beep({ freq:180, dur:0.12, type:'triangle', gain:0.03 });
-  }
+  function playWrong() { beep({ freq:180, dur:0.12, type:'triangle', gain:0.03 }); }
 
   function updateSoundBtn() {
     $('soundBtn').classList.toggle('off', !soundOn);
     $('soundIcon').textContent = soundOn ? '🔊' : '🔇';
     $('soundLabel').textContent = soundOn ? 'おと ON' : 'おと OFF';
+  }
+
+  // ===== ゲージ =====
+  function showGauge(durationMs) {
+    const wrap = $('gaugeWrap');
+    const bar  = $('gaugeBar');
+    bar.style.transition = 'none';
+    bar.style.transform  = 'scaleX(1)';
+    wrap.classList.add('visible');
+    // 次フレームで transition を付けて縮小開始
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        bar.style.transition = `transform ${durationMs}ms linear`;
+        bar.style.transform  = 'scaleX(0)';
+      });
+    });
+  }
+  function hideGauge() {
+    $('gaugeWrap').classList.remove('visible');
+    $('gaugeBar').style.transition = 'none';
+    $('gaugeBar').style.transform  = 'scaleX(1)';
   }
 
   // ===== 表示 =====
@@ -340,27 +369,26 @@
       $('mic').style.display = '';
       $('yomanai').style.display = 'none';
       $('mic').textContent = '🎤 よむ';
+      $('mic').disabled = false;
     }
   }
 
-  // 正解後の自動進行
   function advanceAuto() {
     const next = phase + 1;
     if (next > 2) {
-      // 全フェーズ完了
       PLACES.forEach(pl => {
         $(pl.arrow).textContent = '';
         $(pl.digit).classList.remove('active');
       });
       $('mic').style.display = '';
       $('mic').textContent = '🎤 よむ';
+      $('mic').disabled = false;
       $('yomanai').style.display = 'none';
       $('result').textContent = '○ せいかい！';
       $('result').className = 'result victory';
       $('heard').textContent = '';
       launchStars();
       playVictory();
-      // 1.5秒後に自動で次の問題へ
       setTimeout(newProblem, 1500);
       return;
     }
@@ -376,7 +404,6 @@
 
     const val = placeValue(current, next);
     if (val === 0) {
-      // 0の位：「読まない ✓」を短時間表示→自動スキップ
       $('mic').style.display = 'none';
       $('yomanai').style.display = '';
       setTimeout(() => {
@@ -385,7 +412,6 @@
         setTimeout(advanceAuto, 180);
       }, 150);
     } else {
-      // 通常：自動でリスニング開始
       $('mic').style.display = '';
       $('yomanai').style.display = 'none';
       setTimeout(startListen, 80);
@@ -408,29 +434,22 @@
     setHint(true);
     speakModel(placeValue(current, phase));
     $('mic').textContent = '🎤 もういちど';
+    $('mic').disabled = false;
   }
 
   // ===== 問題生成 =====
   function newProblem() {
-    const lo = allowZero ? 0 : 1;
+    // 百の位：1〜9（0なし）、十・一の位：0〜9
     const h = 1 + Math.floor(Math.random() * 9);
-    const t = lo + Math.floor(Math.random() * (10 - lo));
-    const o = lo + Math.floor(Math.random() * (10 - lo));
+    const t = Math.floor(Math.random() * 10);
+    const o = Math.floor(Math.random() * 10);
     current = h * 100 + t * 10 + o;
     renderNumber(current);
     renderCoins();
     setHint(false);
     startPhase(0);
-    // 最初のフェーズが0なら自動スキップ開始
-    if (placeValue(current, 0) === 0) {
-      setTimeout(() => {
-        $('result').textContent = '読まない ✓';
-        $('result').className = 'result ok';
-        setTimeout(advanceAuto, 180);
-      }, 150);
-    } else {
-      setTimeout(startListen, 100);
-    }
+    // 百の位は必ず1〜9なので自動リスン開始
+    setTimeout(startListen, 100);
   }
 
   // ===== 音声入力 =====
@@ -445,6 +464,25 @@
 
   function rank(kind) { return { match:0, bara:1, wrong:2, unclear:3 }[kind]; }
 
+  // 繰り返し認識の検出：「さんびゃくさんびゃく」→正解
+  function stripRepeats(text, kana) {
+    if (!kana) return text;
+    const re = new RegExp(kana, 'g');
+    return text.replace(/\s/g, '').replace(re, '');
+  }
+
+  function stopGaugeTimer() {
+    if (gaugeTimer) { clearTimeout(gaugeTimer); gaugeTimer = null; }
+  }
+
+  function finishListening() {
+    stopGaugeTimer();
+    hideGauge();
+    recognizing = false;
+    $('mic').disabled = false;
+    if ($('mic').textContent === '🎙 きいてるよ…') $('mic').textContent = '🎤 よむ';
+  }
+
   function startListen() {
     if (!SR) { $('heard').textContent = 'このブラウザは音声に未対応（Chrome推奨）'; return; }
     if (recognizing) return;
@@ -452,6 +490,7 @@
     if (target === 0) return;
 
     const rec = new SR();
+    currentRec = rec;
     rec.lang = 'ja-JP';
     rec.interimResults = false;
     rec.maxAlternatives = 3;
@@ -460,29 +499,58 @@
     $('mic').disabled = true;
     $('result').textContent = '';
     $('result').className = 'result';
+    $('heard').textContent = '';
+
+    // ゲージ開始
+    showGauge(LISTEN_TIMEOUT_MS);
+
+    // タイムアウト：時間切れで認識中止 → よむボタンを返す
+    gaugeTimer = setTimeout(() => {
+      if (recognizing) {
+        try { rec.abort(); } catch(e) {}
+        hideGauge();
+        recognizing = false;
+        $('mic').textContent = '🎤 よむ';
+        $('mic').disabled = false;
+        $('heard').textContent = 'もう一度「よむ」を押してね';
+      }
+    }, LISTEN_TIMEOUT_MS);
 
     rec.onresult = e => {
       const alts = Array.from(e.results[0]).map(r => r.transcript);
+      const kana  = readingKana(target);
       let best = null;
+
       for (const a of alts) {
+        const norm = a.replace(/\s/g, '');
+
+        // 繰り返し認識対策：kana を除去して残りが空または超短なら正解扱い
+        const stripped = stripRepeats(norm, kana);
+        if (stripped.length === 0 || (norm.length > kana.length && stripped.length <= 2)) {
+          best = { ok: true, kind: 'match', said: a };
+          break;
+        }
+
         const v = judge(a, target);
         if (!best || rank(v.kind) < rank(best.kind)) best = { ...v, said: a };
         if (v.kind === 'match') break;
       }
+
+      finishListening();
       if (best && best.ok) onCorrect(best.said);
       else onWrong(best ? best.said : '');
     };
+
     rec.onerror = () => {
+      finishListening();
       $('heard').textContent = 'もう一度ためしてね';
-      recognizing = false;
-      $('mic').textContent = '🎤 よむ';
-      $('mic').disabled = false;
     };
+
     rec.onend = () => {
-      recognizing = false;
-      $('mic').disabled = false;
-      if ($('mic').textContent === '🎙 きいてるよ…') $('mic').textContent = '🎤 よむ';
+      // onresult が先に呼ばれた場合は finishListening() 済みなので二重実行にならない
+      if (recognizing) finishListening();
     };
+
     rec.start();
   }
 
@@ -502,23 +570,6 @@
     soundOn = !soundOn;
     localStorage.setItem('kazuYomiSoundOn', soundOn ? 'on' : 'off');
     updateSoundBtn();
-  });
-
-  $('normalModeBtn').addEventListener('click', () => {
-    if (allowZero) {
-      allowZero = false;
-      $('normalModeBtn').classList.add('active');
-      $('zeroModeBtn').classList.remove('active');
-      newProblem();
-    }
-  });
-  $('zeroModeBtn').addEventListener('click', () => {
-    if (!allowZero) {
-      allowZero = true;
-      $('zeroModeBtn').classList.add('active');
-      $('normalModeBtn').classList.remove('active');
-      newProblem();
-    }
   });
 
   // ===== 初期化 =====
