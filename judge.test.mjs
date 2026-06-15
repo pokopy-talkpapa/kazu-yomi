@@ -27,9 +27,9 @@ test('normalize: 全角→半角・空白整理', () => {
   assert.equal(normalize('  365 '), '365');
 });
 
-test('judge: 数字だけ（位の語なし）→ bara（きびしめ）', () => {
-  assert.equal(judge('365', 365).kind, 'bara');
-  assert.equal(judge('３６５', 365).kind, 'bara');
+test('judge: 数字だけで一致 → match（スペースなし流暢読み扱い）', () => {
+  assert.equal(judge('365', 365).kind, 'match');
+  assert.equal(judge('３６５', 365).kind, 'match');
 });
 
 test('judge: カナの位読みもmatch', () => {
@@ -55,6 +55,6 @@ test('judge: 聞き取れず→unclear', () => {
 
 test('judge: ok フラグ', () => {
   assert.equal(judge('さんびゃくろくじゅうご', 365).ok, true);
-  assert.equal(judge('365', 365).ok, false);   // 位の語なし → bara → NG
-  assert.equal(judge('3 6 5', 365).ok, false);
+  assert.equal(judge('365', 365).ok, true);    // スペースなし → match
+  assert.equal(judge('3 6 5', 365).ok, false); // スペースあり → bara
 });
