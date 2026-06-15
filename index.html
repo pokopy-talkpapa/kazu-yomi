@@ -187,6 +187,22 @@
 
   function rank(kind) { return { match:0, bara:1, wrong:2, unclear:3 }[kind]; }
 
+  // 漢数字（六百三十六 等）→ 数値。変換できなければ null
+  function kanjiToNum(s) {
+    const D = {'〇':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9};
+    let n = 0, i = 0, c = [...s];
+    while (i < c.length) {
+      const d = D[c[i]];
+      if (c[i+1] === '百') { n += (d !== undefined ? d : 1) * 100; i += 2; }
+      else if (c[i] === '百') { n += 100; i++; }
+      else if (c[i+1] === '十') { n += (d !== undefined ? d : 1) * 10; i += 2; }
+      else if (c[i] === '十') { n += 10; i++; }
+      else if (d !== undefined) { n += d; i++; }
+      else { i++; }
+    }
+    return n > 0 ? n : null;
+  }
+
   function showResult(v) {
     $('heard').textContent = v && v.said ? `きこえた：「${v.said}」` : '';
     if (v && v.ok) {
@@ -223,8 +239,11 @@
       if (best && !best.ok) {
         const hasPlace = alts.some(a => /ひゃく|びゃく|ぴゃく|じゅう|百|十/.test(a));
         const numMatch = alts.some(a => {
+          // ASCII・全角数字で一致するか
           const d = a.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\D/g, '');
-          return d.length > 0 && parseInt(d, 10) === current;
+          if (d.length > 0 && parseInt(d, 10) === current) return true;
+          // 漢数字（六百三十六 等）で一致するか
+          return kanjiToNum(a) === current;
         });
         if (hasPlace && numMatch) best = { ok: true, kind: 'match', raw: best.raw, said: best.said };
       }
