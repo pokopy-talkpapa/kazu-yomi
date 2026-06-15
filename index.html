@@ -5,47 +5,76 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>かずよみ</title>
 <style>
-  :root { --line:#222; --ok:#2e9e3f; --ng:#e0453a; --hint:#e5f1ff; }
+  :root { --line:#222; --ok:#2e9e3f; --ng:#e0453a; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: system-ui, sans-serif; background:#fffdf7; color:var(--line);
          display:flex; flex-direction:column; align-items:center; min-height:100vh; }
-  h1 { font-size:1.2rem; margin:12px 0 4px; }
+  h1 { font-size:1.2rem; margin:12px 0 6px; }
+
   .board { width:min(94vw, 520px); }
+
   table.place { width:100%; border-collapse:collapse; table-layout:fixed; }
-  table.place th { font-size:1rem; font-weight:600; padding:6px 0; color:#555; text-align:center; }
-  table.place td { border-left:3px solid var(--line); border-right:3px solid var(--line);
-                   text-align:center; vertical-align:top; }
-  table.place td:first-child { border-left:none; }
-  table.place td:last-child { border-right:none; }
-  .digit { font-size:4rem; line-height:1.1; border-bottom:4px solid var(--line); }
+
+  /* 位ラベル：ヒントOFFは非表示（スペースは確保） */
+  table.place th {
+    font-size:1rem; font-weight:600; padding:6px 0; text-align:center;
+    visibility: hidden;
+  }
+  body.hint-on table.place th { visibility: visible; color:#555; }
+
+  /* 縦線（セル境界）：ヒントOFFは透明 */
+  table.place td {
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+    text-align:center; vertical-align:top;
+  }
+  table.place td:first-child { border-left: none; }
+  table.place td:last-child  { border-right: none; }
+  body.hint-on table.place td {
+    border-left-color: var(--line);
+    border-right-color: var(--line);
+  }
+  body.hint-on table.place td:first-child { border-left: none; }
+  body.hint-on table.place td:last-child  { border-right: none; }
+
+  /* 数字行：常に表示 */
+  .digit { font-size:4rem; line-height:1.1; border-bottom: 4px solid transparent; }
+  body.hint-on .digit { border-bottom-color: var(--line); }
+
+  /* コインエリア：スペースは常に確保、中身はヒントOFFで非表示 */
   .coins { min-height:46vh; padding-top:8px; }
-  .controls { display:flex; gap:12px; align-items:center; margin:16px 0; }
-  button { font-size:1.1rem; padding:12px 18px; border-radius:14px; border:2px solid var(--line);
-           background:#fff; cursor:pointer; }
-  #mic { font-size:1.4rem; padding:16px 26px; }
-  .result { font-size:2.4rem; min-height:3rem; font-weight:700; }
-  .result.ok { color:var(--ok); } .result.ng { color:var(--ng); }
-  .lv { display:flex; gap:8px; margin:8px 0; }
-  .lv button[aria-pressed="true"] { background:var(--line); color:#fff; }
-  .heard { color:#888; font-size:.9rem; min-height:1.2rem; }
+  .coins > * { visibility: hidden; }
+  body.hint-on .coins > * { visibility: visible; }
+
   /* コイン配置（りんごアプリ準拠） */
   .coinGroup { display:flex; gap:4%; justify-content:flex-start; align-items:flex-end;
                height:100%; padding:0 4px; }
   .coinCol { display:flex; flex-direction:column-reverse; align-items:center; gap:4px;
              flex:0 0 46%; }
   .coinImg { width:100%; max-width:64px; object-fit:contain; user-select:none; pointer-events:none; }
+
   /* 0の位：空っぽの皿 */
   .empty { display:flex; align-items:flex-start; justify-content:center; height:100%; padding-top:8px; }
   .empty span { color:#bbb; font-size:.9rem; border:2px dashed #ccc; border-radius:10px; padding:6px 10px; }
+
+  /* 結果・操作 */
+  .result { font-size:2.4rem; min-height:3rem; font-weight:700; margin-top:8px; }
+  .result.ok { color:var(--ok); } .result.ng { color:var(--ng); }
+  .heard { color:#888; font-size:.9rem; min-height:1.2rem; }
+  .controls { display:flex; gap:12px; align-items:center; margin:12px 0; flex-wrap:wrap; justify-content:center; }
+  button { font-size:1.1rem; padding:12px 18px; border-radius:14px; border:2px solid var(--line);
+           background:#fff; cursor:pointer; }
+  #mic { font-size:1.4rem; padding:16px 26px; }
+  #hint { background:#fff8dc; }
+  #hint[aria-pressed="true"] { background:#ffe066; }
+  .sub-controls { display:flex; gap:8px; margin-bottom:4px; align-items:center; font-size:.9rem; }
 </style>
 </head>
 <body>
   <h1>かずを こえで よもう</h1>
-  <div class="lv">
-    <button id="lv1" aria-pressed="true">Lv1（おかね あり）</button>
-    <button id="lv2" aria-pressed="false">Lv2（すうじ だけ）</button>
+  <div class="sub-controls">
+    <label><input type="checkbox" id="zero"> 0のれんしゅう（108など）</label>
   </div>
-  <label style="font-size:.9rem; margin-bottom:6px;"><input type="checkbox" id="zero"> 0のれんしゅう（108など）</label>
   <div class="board">
     <table class="place">
       <thead><tr><th>百のくらい</th><th>十のくらい</th><th>一のくらい</th></tr></thead>
@@ -67,13 +96,14 @@
   <div class="heard" id="heard"></div>
   <div class="controls">
     <button id="mic">🎤 よむ</button>
+    <button id="hint" aria-pressed="false">💡 ヒント</button>
     <button id="next">つぎ ▶</button>
   </div>
 
   <script src="judge.js"></script>
   <script>
   let current = 365;
-  let level = 1;
+  let hintActive = false;
 
   const $ = id => document.getElementById(id);
 
@@ -85,10 +115,8 @@
 
   const COIN_FILE = { 100: 'imgs/money_100.png', 10: 'imgs/money_10.png', 1: 'imgs/money_1.png' };
 
-  // りんごアプリ準拠：1列5枚まで・下から積む(column-reverse)・6枚目から右列・左列優先
   function renderOnePlace(el, file, count) {
     el.textContent = '';
-    if (level === 2) { return; }
     if (count === 0) { el.innerHTML = '<div class="empty"><span>０まい</span></div>'; return; }
     const group = document.createElement('div');
     group.className = 'coinGroup';
@@ -113,6 +141,13 @@
     renderOnePlace($('c1'),   COIN_FILE[1],   current % 10);
   }
 
+  function setHint(on) {
+    hintActive = on;
+    document.body.classList.toggle('hint-on', on);
+    $('hint').setAttribute('aria-pressed', on);
+    $('hint').textContent = on ? '💡 ヒント ON' : '💡 ヒント';
+  }
+
   function newProblem() {
     const allowZero = $('zero').checked;
     const h = 1 + Math.floor(Math.random() * 9);
@@ -121,22 +156,15 @@
     const o = lo + Math.floor(Math.random() * (10 - lo));
     current = h * 100 + t * 10 + o;
     renderNumber(current);
+    renderCoins();
     $('result').textContent = ''; $('result').className = 'result';
     $('heard').textContent = '';
     $('mic').textContent = '🎤 よむ';
-    renderCoins();
-  }
-
-  function setLevel(lv) {
-    level = lv;
-    $('lv1').setAttribute('aria-pressed', lv === 1);
-    $('lv2').setAttribute('aria-pressed', lv === 2);
-    renderCoins();
+    setHint(false); // 新しい問題はヒントOFFから
   }
 
   $('next').addEventListener('click', newProblem);
-  $('lv1').addEventListener('click', () => setLevel(1));
-  $('lv2').addEventListener('click', () => setLevel(2));
+  $('hint').addEventListener('click', () => setHint(!hintActive));
 
   // ===== 音声入力 =====
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -151,8 +179,8 @@
     speechSynthesis.cancel(); speechSynthesis.speak(u);
   }
 
-  function onWrong(v) {
-    if (level === 2) setLevel(1);
+  function onWrong() {
+    setHint(true); // ×のときはヒント自動ON
     speakModel(current);
     $('mic').textContent = '🎤 もういちど';
   }
@@ -167,7 +195,7 @@
     } else {
       $('result').textContent = '× もういちど';
       $('result').className = 'result ng';
-      onWrong(v);
+      onWrong();
     }
   }
 
@@ -192,8 +220,14 @@
       }
       showResult(best);
     };
-    rec.onerror = () => { $('heard').textContent = 'もう一度ためしてね'; recognizing = false; $('mic').textContent = '🎤 よむ'; };
-    rec.onend = () => { recognizing = false; if ($('mic').textContent === '🎙 きいてるよ…') $('mic').textContent = '🎤 よむ'; };
+    rec.onerror = () => {
+      $('heard').textContent = 'もう一度ためしてね';
+      recognizing = false; $('mic').textContent = '🎤 よむ';
+    };
+    rec.onend = () => {
+      recognizing = false;
+      if ($('mic').textContent === '🎙 きいてるよ…') $('mic').textContent = '🎤 よむ';
+    };
     rec.start();
   }
 

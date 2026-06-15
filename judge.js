@@ -55,6 +55,9 @@
     const value = parseInt(digits, 10);
     if (value !== target) return { ok: false, kind: 'wrong', raw };
 
+    // 数字だけで一致しても、位の語（ひゃく/じゅう）がなければバラ読み扱い
+    if (!hasPlaceWords(raw)) return { ok: false, kind: 'bara', raw };
+
     return { ok: true, kind: 'match', raw };
   }
 
