@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>かずよみ</title>
 <style>
-  :root { --line:#222; --ok:#2e9e3f; --ng:#e0453a; }
+  :root { --line:#222; --ok:#2e9e3f; --ng:#e0453a; --hi:#ddeeff; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: system-ui, sans-serif; background:#fffdf7; color:var(--line);
          display:flex; flex-direction:column; align-items:center; min-height:100vh; }
@@ -15,45 +15,45 @@
 
   table.place { width:100%; border-collapse:collapse; table-layout:fixed; }
 
-  /* 位ラベル：ヒントOFFは非表示（スペースは確保） */
-  table.place th {
-    font-size:1rem; font-weight:600; padding:6px 0; text-align:center;
-    visibility: hidden;
-  }
-  body.hint-on table.place th { visibility: visible; color:#555; }
+  /* 矢印行 */
+  .arrow-row td { text-align:center; font-size:1.8rem; line-height:1; height:2rem; padding:0;
+                  color:#4a9eff; transition:opacity .15s; }
 
-  /* 縦線（セル境界）：ヒントOFFは透明 */
+  /* 位ラベル */
+  table.place th {
+    font-size:1rem; font-weight:600; padding:6px 0; text-align:center; visibility:hidden;
+  }
+  body.hint-on table.place th { visibility:visible; color:#555; }
+
+  /* 縦線 */
   table.place td {
-    border-left: 3px solid transparent;
-    border-right: 3px solid transparent;
+    border-left:3px solid transparent; border-right:3px solid transparent;
     text-align:center; vertical-align:top;
   }
-  table.place td:first-child { border-left: none; }
-  table.place td:last-child  { border-right: none; }
-  body.hint-on table.place td {
-    border-left-color: var(--line);
-    border-right-color: var(--line);
-  }
-  body.hint-on table.place td:first-child { border-left: none; }
-  body.hint-on table.place td:last-child  { border-right: none; }
+  table.place td:first-child { border-left:none; }
+  table.place td:last-child  { border-right:none; }
+  body.hint-on table.place td            { border-left-color:var(--line); border-right-color:var(--line); }
+  body.hint-on table.place td:first-child { border-left:none; }
+  body.hint-on table.place td:last-child  { border-right:none; }
 
-  /* 数字行：常に表示 */
-  .digit { font-size:4rem; line-height:1.1; border-bottom: 4px solid transparent; }
-  body.hint-on .digit { border-bottom-color: var(--line); }
+  /* 数字行 */
+  .digit { font-size:4rem; line-height:1.2; border-bottom:4px solid transparent;
+           border-radius:10px; transition:background .15s; padding:2px 0; }
+  body.hint-on .digit { border-bottom-color:var(--line); }
+  .digit.active { background:var(--hi); }
 
-  /* コインエリア：スペースは常に確保、中身はヒントOFFで非表示 */
-  .coins { min-height:46vh; padding-top:8px; }
-  .coins > * { visibility: hidden; }
-  body.hint-on .coins > * { visibility: visible; }
+  /* コインエリア */
+  .coins { min-height:40vh; padding-top:8px; }
+  .coins > * { visibility:hidden; }
+  body.hint-on .coins > * { visibility:visible; }
 
   /* コイン配置（りんごアプリ準拠） */
   .coinGroup { display:flex; gap:4%; justify-content:flex-start; align-items:flex-end;
                height:100%; padding:0 4px; }
-  .coinCol { display:flex; flex-direction:column-reverse; align-items:center; gap:4px;
-             flex:0 0 46%; }
+  .coinCol { display:flex; flex-direction:column-reverse; align-items:center; gap:4px; flex:0 0 46%; }
   .coinImg { width:100%; max-width:64px; object-fit:contain; user-select:none; pointer-events:none; }
 
-  /* 0の位：空っぽの皿 */
+  /* 0の皿 */
   .empty { display:flex; align-items:flex-start; justify-content:center; height:100%; padding-top:8px; }
   .empty span { color:#bbb; font-size:.9rem; border:2px dashed #ccc; border-radius:10px; padding:6px 10px; }
 
@@ -65,9 +65,30 @@
   button { font-size:1.1rem; padding:12px 18px; border-radius:14px; border:2px solid var(--line);
            background:#fff; cursor:pointer; }
   #mic { font-size:1.4rem; padding:16px 26px; }
+  #yomanai { font-size:1.2rem; padding:14px 22px; background:#f0f8ff; border-color:#4a9eff; color:#226; }
   #hint { background:#fff8dc; }
   #hint[aria-pressed="true"] { background:#ffe066; }
   .sub-controls { display:flex; gap:8px; margin-bottom:4px; align-items:center; font-size:.9rem; }
+
+  @keyframes pop { 0%{transform:scale(.8);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
+  .result.pop { animation:pop .35s ease-out; }
+
+  /* 全正解エフェクト */
+  @keyframes victory {
+    0%  { transform:scale(0.3); opacity:0; }
+    50% { transform:scale(1.35); opacity:1; }
+    70% { transform:scale(0.92); }
+    100%{ transform:scale(1); opacity:1; }
+  }
+  .result.victory { font-size:3.2rem; animation:victory .55s cubic-bezier(.36,.07,.19,.97) both; color:#e8a000; }
+
+  /* 飛び出す星 */
+  .star { position:fixed; font-size:1.8rem; pointer-events:none; z-index:99;
+          animation:flystar .7s ease-out forwards; }
+  @keyframes flystar {
+    0%  { opacity:1; transform:translate(0,0) scale(1); }
+    100%{ opacity:0; transform:translate(var(--dx),var(--dy)) scale(0.4); }
+  }
 </style>
 </head>
 <body>
@@ -79,6 +100,9 @@
     <table class="place">
       <thead><tr><th>百のくらい</th><th>十のくらい</th><th>一のくらい</th></tr></thead>
       <tbody>
+        <tr class="arrow-row">
+          <td id="a100"></td><td id="a10"></td><td id="a1"></td>
+        </tr>
         <tr>
           <td class="digit" id="d100">3</td>
           <td class="digit" id="d10">6</td>
@@ -96,6 +120,7 @@
   <div class="heard" id="heard"></div>
   <div class="controls">
     <button id="mic">🎤 よむ</button>
+    <button id="yomanai" style="display:none">読まない ▶</button>
     <button id="hint" aria-pressed="false">💡 ヒント</button>
     <button id="next">つぎ ▶</button>
   </div>
@@ -103,9 +128,23 @@
   <script src="judge.js"></script>
   <script>
   let current = 365;
+  let phase = 0;   // 0=百, 1=十, 2=一
   let hintActive = false;
+  let recognizing = false;
 
   const $ = id => document.getElementById(id);
+
+  const PLACES = [
+    { arrow:'a100', digit:'d100', coins:'c100' },
+    { arrow:'a10',  digit:'d10',  coins:'c10'  },
+    { arrow:'a1',   digit:'d1',   coins:'c1'   },
+  ];
+
+  function placeValue(n, p) {
+    if (p === 0) return Math.floor(n / 100) * 100;
+    if (p === 1) return Math.floor(n / 10) % 10 * 10;
+    return n % 10;
+  }
 
   function renderNumber(n) {
     $('d100').textContent = Math.floor(n / 100) % 10;
@@ -113,21 +152,19 @@
     $('d1').textContent   = n % 10;
   }
 
-  const COIN_FILE = { 100: 'imgs/money_100.png', 10: 'imgs/money_10.png', 1: 'imgs/money_1.png' };
+  const COIN_FILE = { 100:'imgs/money_100.png', 10:'imgs/money_10.png', 1:'imgs/money_1.png' };
 
   function renderOnePlace(el, file, count) {
     el.textContent = '';
     if (count === 0) { el.innerHTML = '<div class="empty"><span>０まい</span></div>'; return; }
     const group = document.createElement('div');
     group.className = 'coinGroup';
-    const columns = count <= 5 ? [count] : [5, count - 5];
-    columns.forEach(n => {
+    (count <= 5 ? [count] : [5, count - 5]).forEach(n => {
       const col = document.createElement('div');
       col.className = 'coinCol';
       for (let i = 0; i < n; i++) {
         const img = document.createElement('img');
-        img.className = 'coinImg';
-        img.src = file; img.alt = '';
+        img.className = 'coinImg'; img.src = file; img.alt = '';
         col.appendChild(img);
       }
       group.appendChild(col);
@@ -148,6 +185,100 @@
     $('hint').textContent = on ? '💡 ヒント ON' : '💡 ヒント';
   }
 
+  function startPhase(p) {
+    phase = p;
+    PLACES.forEach((pl, i) => {
+      $(pl.arrow).textContent = i === p ? '▼' : '';
+      $(pl.digit).classList.toggle('active', i === p);
+    });
+    const val = placeValue(current, p);
+    if (val === 0) {
+      $('mic').style.display = 'none';
+      $('yomanai').style.display = '';
+    } else {
+      $('mic').style.display = '';
+      $('yomanai').style.display = 'none';
+      $('mic').textContent = '🎤 よむ';
+    }
+    $('result').textContent = '';
+    $('result').className = 'result';
+    $('heard').textContent = '';
+  }
+
+  function launchStars() {
+    const dirs = [[-90,-80],[90,-80],[0,-100],[-120,-40],[120,-40],[-60,-110],[60,-110],[0,-120]];
+    const cx = window.innerWidth / 2, cy = window.innerHeight * 0.38;
+    dirs.forEach(([dx, dy], i) => {
+      const s = document.createElement('div');
+      s.className = 'star';
+      s.textContent = ['★','✨','⭐'][i % 3];
+      s.style.left = cx + 'px'; s.style.top = cy + 'px';
+      s.style.setProperty('--dx', dx + 'px');
+      s.style.setProperty('--dy', dy + 'px');
+      s.style.animationDelay = (i * 0.04) + 's';
+      document.body.appendChild(s);
+      setTimeout(() => s.remove(), 900);
+    });
+  }
+
+  // 正解後の自動進行（0スキップ・自動リスン込み）
+  function advanceAuto() {
+    const next = phase + 1;
+    if (next > 2) {
+      // 全フェーズ完了
+      PLACES.forEach(pl => { $(pl.arrow).textContent = ''; $(pl.digit).classList.remove('active'); });
+      $('mic').style.display = '';
+      $('yomanai').style.display = 'none';
+      $('mic').textContent = '🎤 よむ';
+      $('result').textContent = '○ せいかい！';
+      $('result').className = 'result victory';
+      $('heard').textContent = '';
+      launchStars();
+      return;
+    }
+    phase = next;
+    PLACES.forEach((pl, i) => {
+      $(pl.arrow).textContent = i === next ? '▼' : '';
+      $(pl.digit).classList.toggle('active', i === next);
+    });
+    $('result').textContent = '';
+    $('result').className = 'result';
+    $('heard').textContent = '';
+
+    const val = placeValue(current, next);
+    if (val === 0) {
+      // 0の位：矢印だけ見せて「読まない ✓」を自動表示→次へ
+      $('mic').style.display = 'none';
+      $('yomanai').style.display = '';
+      setTimeout(() => {
+        $('result').textContent = '読まない ✓';
+        $('result').className = 'result ok';
+        setTimeout(advanceAuto, 180);
+      }, 150);
+    } else {
+      // 通常の位：自動でリスニング開始
+      $('mic').style.display = '';
+      $('yomanai').style.display = 'none';
+      setTimeout(startListen, 80);
+    }
+  }
+
+  function onCorrect(said) {
+    $('heard').textContent = said ? `きこえた：「${said}」` : '';
+    $('result').textContent = '✓';
+    $('result').className = 'result ok';
+    setTimeout(advanceAuto, 180);
+  }
+
+  function onWrong(said) {
+    $('heard').textContent = said ? `きこえた：「${said}」` : '';
+    $('result').textContent = '× もういちど';
+    $('result').className = 'result ng';
+    setHint(true);
+    speakModel(placeValue(current, phase));
+    $('mic').textContent = '🎤 もういちど';
+  }
+
   function newProblem() {
     const allowZero = $('zero').checked;
     const h = 1 + Math.floor(Math.random() * 9);
@@ -157,67 +288,39 @@
     current = h * 100 + t * 10 + o;
     renderNumber(current);
     renderCoins();
-    $('result').textContent = ''; $('result').className = 'result';
-    $('heard').textContent = '';
-    $('mic').textContent = '🎤 よむ';
-    setHint(false); // 新しい問題はヒントOFFから
+    setHint(false);
+    startPhase(0);
   }
 
   $('next').addEventListener('click', newProblem);
   $('hint').addEventListener('click', () => setHint(!hintActive));
 
+  // 読まない：手動で押したとき
+  $('yomanai').addEventListener('click', () => {
+    $('result').textContent = '読まない ✓';
+    $('result').className = 'result ok';
+    $('heard').textContent = '';
+    setTimeout(advanceAuto, 350);
+  });
+
   // ===== 音声入力 =====
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let recognizing = false;
 
   function speakModel(n) {
     if (!('speechSynthesis' in window)) return;
-    const h = Math.floor(n / 100) % 10, t = Math.floor(n / 10) % 10, o = n % 10;
-    const parts = [readingKana(h * 100), readingKana(t * 10), readingKana(o)].filter(Boolean);
-    const u = new SpeechSynthesisUtterance(parts.join('、'));
+    const u = new SpeechSynthesisUtterance(readingKana(n));
     u.lang = 'ja-JP'; u.rate = 0.85;
     speechSynthesis.cancel(); speechSynthesis.speak(u);
   }
 
-  function onWrong() {
-    setHint(true); // ×のときはヒント自動ON
-    speakModel(current);
-    $('mic').textContent = '🎤 もういちど';
-  }
-
   function rank(kind) { return { match:0, bara:1, wrong:2, unclear:3 }[kind]; }
-
-  // 漢数字（六百三十六 等）→ 数値。変換できなければ null
-  function kanjiToNum(s) {
-    const D = {'〇':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9};
-    let n = 0, i = 0, c = [...s];
-    while (i < c.length) {
-      const d = D[c[i]];
-      if (c[i+1] === '百') { n += (d !== undefined ? d : 1) * 100; i += 2; }
-      else if (c[i] === '百') { n += 100; i++; }
-      else if (c[i+1] === '十') { n += (d !== undefined ? d : 1) * 10; i += 2; }
-      else if (c[i] === '十') { n += 10; i++; }
-      else if (d !== undefined) { n += d; i++; }
-      else { i++; }
-    }
-    return n > 0 ? n : null;
-  }
-
-  function showResult(v) {
-    $('heard').textContent = v && v.said ? `きこえた：「${v.said}」` : '';
-    if (v && v.ok) {
-      $('result').textContent = '○ せいかい！';
-      $('result').className = 'result ok';
-    } else {
-      $('result').textContent = '× もういちど';
-      $('result').className = 'result ng';
-      onWrong();
-    }
-  }
 
   function startListen() {
     if (!SR) { $('heard').textContent = 'このブラウザは音声に未対応（Chrome推奨）'; return; }
     if (recognizing) return;
+    const target = placeValue(current, phase);
+    if (target === 0) return;
+
     const rec = new SR();
     rec.lang = 'ja-JP';
     rec.interimResults = false;
@@ -230,24 +333,12 @@
       const alts = Array.from(e.results[0]).map(r => r.transcript);
       let best = null;
       for (const a of alts) {
-        const v = judge(a, current);
+        const v = judge(a, target);
         if (!best || rank(v.kind) < rank(best.kind)) best = { ...v, said: a };
         if (v.kind === 'match') break;
       }
-      // 候補の中に「百/十/ひゃく/じゅう」などの位の語が含まれていて、
-      // かつどれかの候補の数字が正解と一致 → 正しく位で読めたと判断して○に昇格
-      if (best && !best.ok) {
-        const hasPlace = alts.some(a => /ひゃく|びゃく|ぴゃく|じゅう|百|十/.test(a));
-        const numMatch = alts.some(a => {
-          // ASCII・全角数字で一致するか
-          const d = a.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\D/g, '');
-          if (d.length > 0 && parseInt(d, 10) === current) return true;
-          // 漢数字（六百三十六 等）で一致するか
-          return kanjiToNum(a) === current;
-        });
-        if (hasPlace && numMatch) best = { ok: true, kind: 'match', raw: best.raw, said: best.said };
-      }
-      showResult(best);
+      if (best && best.ok) onCorrect(best.said);
+      else onWrong(best ? best.said : '');
     };
     rec.onerror = () => {
       $('heard').textContent = 'もう一度ためしてね';
@@ -265,6 +356,7 @@
   // 初期表示
   renderNumber(current);
   renderCoins();
+  startPhase(0);
   </script>
 </body>
 </html>
