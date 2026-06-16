@@ -240,9 +240,8 @@
   let gaugeTimer   = null;
 
   // continuous SR 管理
-  let contRec      = null;   // 現在のSRインスタンス
-  let phaseReady   = false;  // 結果を受け付けるか（フェーズごとに1回）
-  let contProbId   = 0;      // 古い問題の結果を弾く
+  let contRec    = null;   // 現在のSRインスタンス
+  let phaseReady = false;  // 結果を受け付けるか（フェーズごとに1回）
 
   const $ = id => document.getElementById(id);
 
@@ -450,32 +449,31 @@
     else onWrong(best ? best.said : '');
   }
 
-  // 1問につき1回だけ呼ぶ（continuous セッション作成）
+  // 新規 SR セッション作成（初回 or 不正解後 or 意図しない切断後）
   function startContSession() {
     if (!SR) { $('heard').textContent = 'Chrome推奨'; return; }
     stopContSession();
-    const pid = ++contProbId;
     const rec = new SR();
     contRec = rec;
     rec.lang = 'ja-JP';
-    rec.continuous     = true;   // フェーズをまたいで1セッション維持
+    rec.continuous     = true;   // 問題をまたいで1セッション維持
     rec.interimResults = false;
     rec.maxAlternatives = 3;
 
     rec.onresult = e => {
-      if (pid !== contProbId || !phaseReady) return;
+      if (!phaseReady) return; // 受付中でなければ無視（問題切替の隙間も安全）
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (!e.results[i].isFinal) continue;
         const target = placeValue(current, phase);
         if (target === 0) continue;
-        phaseReady = false; // 1フェーズ1結果だけ処理
+        phaseReady = false; // 1フェーズ1結果だけ
         const alts = Array.from(e.results[i]).map(r => r.transcript);
         processAlternatives(alts, target);
         break;
       }
     };
     rec.onerror = e => {
-      if (pid !== contProbId) return;
+      if (contRec !== rec) return;
       if (e.error === 'no-speech' || e.error === 'aborted') return;
       stopContSession();
       $('mic').textContent = '🎤 よむ';
@@ -483,13 +481,13 @@
       $('heard').textContent = 'もう一度ためしてね';
     };
     rec.onend = () => {
-      if (contRec === rec) { contRec = null; }
+      if (contRec === rec) { contRec = null; } // 意図しない切断を検知
     };
     rec.start();
-    armPhase(); // フェーズ0の聴き取り開始
+    armPhase();
   }
 
-  // wrong後の手動リトライ（セッション再作成）
+  // wrong後の手動リトライ
   function retryListen() {
     startContSession();
   }
@@ -498,8 +496,10 @@
   function advanceAuto() {
     const next = phase + 1;
     if (next > 2) {
-      // 全フェーズ完了
-      stopContSession();
+      // 全フェーズ完了：セッションは止めない（バナーを消さない）
+      stopGaugeTimer();
+      hideGauge();
+      phaseReady = false; // 次問題まで結果を受け付けない
       PLACES.forEach(pl => { $(pl.arrow).textContent = ''; $(pl.digit).classList.remove('active'); });
       $('mic').style.display = '';
       $('mic').textContent = '🎤 よむ';
@@ -568,7 +568,11 @@
     renderCoins();
     setHint(false);
     startPhase(0);
-    setTimeout(startContSession, 80); // 1問1セッション開始
+    if (contRec) {
+      armPhase(); // セッション継続（バナー維持）
+    } else {
+      setTimeout(startContSession, 80); // 初回 or 不正解後 or 切断後
+    }
   }
 
   // ===== スタートボタン =====
