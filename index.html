@@ -46,11 +46,40 @@
   /* ===== スタート画面 ===== */
   .startScreen {
     display:flex; flex-direction:column; align-items:center;
-    padding:40px 20px 48px; gap:24px;
+    padding:36px 24px 44px; gap:20px;
   }
   .startMsg {
     margin:0; font-size:1.1rem; font-weight:700; color:#555;
   }
+  .howto {
+    width:100%; background:#f5f7fa; border-radius:14px;
+    padding:16px 18px; display:flex; flex-direction:column; gap:10px;
+  }
+  .howto-title {
+    font-size:0.8rem; font-weight:700; color:#888; letter-spacing:.06em;
+    margin:0;
+  }
+  .howto-steps {
+    margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px;
+  }
+  .howto-steps li {
+    display:flex; align-items:flex-start; gap:10px;
+    font-size:0.95rem; line-height:1.5; color:#333;
+  }
+  .howto-num {
+    flex-shrink:0; width:22px; height:22px; border-radius:50%;
+    background:var(--dark); color:#fff;
+    font-size:0.75rem; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    margin-top:1px;
+  }
+  .howto-ex {
+    margin-top:6px; padding:8px 12px;
+    background:#fff; border-radius:10px;
+    font-size:0.82rem; color:#555; line-height:1.7;
+    border:1px solid #e8eaee;
+  }
+  .howto-ex strong { color:#333; }
   .startBtn {
     border:0; border-radius:16px; font-weight:950; cursor:pointer;
     padding:18px 48px; font-size:22px;
@@ -184,6 +213,20 @@
     <!-- スタート画面 -->
     <div class="startScreen" id="startScreen">
       <p class="startMsg">3けたの かずを こえで よもう</p>
+      <div class="howto">
+        <p class="howto-title">あそびかた</p>
+        <ul class="howto-steps">
+          <li><span class="howto-num">1</span><span>▼ が さした <strong>くらい</strong> を こえで よもう</span></li>
+          <li><span class="howto-num">2</span><span>マイクに <strong>はっきり・ゆっくり</strong> いおう</span></li>
+          <li><span class="howto-num">3</span><span>3つ ぜんぶ せいかい で つぎの もんだいへ！</span></li>
+        </ul>
+        <div class="howto-ex">
+          <strong>438</strong> の ばあい →
+          百のくらい「<strong>よんひゃく</strong>」→
+          十のくらい「<strong>さんじゅう</strong>」→
+          一のくらい「<strong>はち</strong>」
+        </div>
+      </div>
       <button class="startBtn" id="startBtn" type="button">▶ はじめる</button>
     </div>
 
