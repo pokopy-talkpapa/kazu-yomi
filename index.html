@@ -514,10 +514,9 @@
     const rec = new SR();
     currentRec = rec;
     rec.lang = 'ja-JP';
-    rec.interimResults = true;   // 中間結果で即時判定
+    rec.interimResults = false;  // 精度優先：最終結果のみ使用
     rec.maxAlternatives = 3;
     recognizing = true;
-    let handled = false;
 
     $('mic').textContent = '🎙 きいてるよ…';
     $('mic').disabled = true;
@@ -538,37 +537,14 @@
     }, LISTEN_TIMEOUT_MS);
 
     rec.onresult = e => {
-      if (handled) return;
-      const kana = readingKana(target);
-
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const result = e.results[i];
-        const transcript = result[0].transcript;
-        const norm = transcript.replace(/\s/g, '');
-
-        if (!result.isFinal) {
-          // ===== 中間結果：かな完全一致なら即正解 =====
-          if (norm === kana || isRepeatMatch(norm, kana)) {
-            handled = true;
-            try { rec.abort(); } catch(e) {}
-            finishListening();
-            onCorrect(transcript);
-            return;
-          }
-        } else {
-          // ===== 最終結果：フル判定 =====
-          if (handled) return;
-          handled = true;
-          const alts = Array.from(result).map(r => r.transcript);
-          finishListening();
-          processAlternatives(alts, target);
-          return;
-        }
-      }
+      const alts = Array.from(e.results[0]).map(r => r.transcript);
+      finishListening();
+      processAlternatives(alts, target);
     };
 
     rec.onerror = () => {
-      if (!handled) { handled = true; finishListening(); $('heard').textContent = 'もう一度ためしてね'; }
+      finishListening();
+      $('heard').textContent = 'もう一度ためしてね';
     };
     rec.onend = () => {
       if (recognizing) finishListening();
