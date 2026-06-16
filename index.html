@@ -233,13 +233,16 @@
   const LISTEN_TIMEOUT_MS = 5000;
 
   // ===== 状態 =====
-  let current    = 0;
-  let phase      = 0;
-  let hintActive = false;
-  let recognizing = false;
-  let soundOn    = localStorage.getItem('kazuYomiSoundOn') !== 'off';
-  let gaugeTimer = null;
-  let currentRec = null;
+  let current      = 0;
+  let phase        = 0;
+  let hintActive   = false;
+  let soundOn      = localStorage.getItem('kazuYomiSoundOn') !== 'off';
+  let gaugeTimer   = null;
+
+  // continuous SR 管理
+  let contRec      = null;   // 現在のSRインスタンス
+  let phaseReady   = false;  // 結果を受け付けるか（フェーズごとに1回）
+  let contProbId   = 0;      // 古い問題の結果を弾く
 
   const $ = id => document.getElementById(id);
 
@@ -384,9 +387,119 @@
     }
   }
 
+  // ===== 音声認識（continuous：1問1セッション） =====
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  function speakModel(n) {
+    if (!('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(readingKana(n));
+    u.lang = 'ja-JP'; u.rate = 0.85;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  }
+
+  function rank(kind) { return { match:0, bara:1, wrong:2, unclear:3 }[kind]; }
+
+  function stripRepeats(text, kana) {
+    if (!kana) return text;
+    return text.replace(/\s/g, '').replace(new RegExp(kana, 'g'), '');
+  }
+  function isRepeatMatch(norm, kana) {
+    if (!kana || !kana.length) return false;
+    const s = stripRepeats(norm, kana);
+    return s.length === 0 || (norm.length >= kana.length && s.length <= 2);
+  }
+
+  function stopGaugeTimer() {
+    if (gaugeTimer) { clearTimeout(gaugeTimer); gaugeTimer = null; }
+  }
+
+  // セッションを止める（wrong / victory / timeout のとき）
+  function stopContSession() {
+    stopGaugeTimer();
+    hideGauge();
+    phaseReady = false;
+    if (contRec) { try { contRec.stop(); } catch(e) {} contRec = null; }
+  }
+
+  // このフェーズの聴き取りを開始（ゲージ＋タイムアウト）
+  function armPhase() {
+    stopGaugeTimer();
+    phaseReady = true;
+    $('mic').textContent = '🎙 きいてるよ…';
+    $('mic').disabled = true;
+    showGauge(LISTEN_TIMEOUT_MS);
+    gaugeTimer = setTimeout(() => {
+      stopContSession();
+      $('mic').textContent = '🎤 よむ';
+      $('mic').disabled = false;
+      $('heard').textContent = 'もう一度「よむ」を押してね';
+    }, LISTEN_TIMEOUT_MS);
+  }
+
+  function processAlternatives(alts, target) {
+    const kana = readingKana(target);
+    let best = null;
+    for (const a of alts) {
+      const norm = a.replace(/\s/g, '');
+      if (isRepeatMatch(norm, kana)) { best = { ok:true, kind:'match', said:a }; break; }
+      const v = judge(a, target);
+      if (!best || rank(v.kind) < rank(best.kind)) best = { ...v, said:a };
+      if (v.kind === 'match') break;
+    }
+    if (best && best.ok) onCorrect(best.said);
+    else onWrong(best ? best.said : '');
+  }
+
+  // 1問につき1回だけ呼ぶ（continuous セッション作成）
+  function startContSession() {
+    if (!SR) { $('heard').textContent = 'Chrome推奨'; return; }
+    stopContSession();
+    const pid = ++contProbId;
+    const rec = new SR();
+    contRec = rec;
+    rec.lang = 'ja-JP';
+    rec.continuous     = true;   // フェーズをまたいで1セッション維持
+    rec.interimResults = false;
+    rec.maxAlternatives = 3;
+
+    rec.onresult = e => {
+      if (pid !== contProbId || !phaseReady) return;
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (!e.results[i].isFinal) continue;
+        const target = placeValue(current, phase);
+        if (target === 0) continue;
+        phaseReady = false; // 1フェーズ1結果だけ処理
+        const alts = Array.from(e.results[i]).map(r => r.transcript);
+        processAlternatives(alts, target);
+        break;
+      }
+    };
+    rec.onerror = e => {
+      if (pid !== contProbId) return;
+      if (e.error === 'no-speech' || e.error === 'aborted') return;
+      stopContSession();
+      $('mic').textContent = '🎤 よむ';
+      $('mic').disabled = false;
+      $('heard').textContent = 'もう一度ためしてね';
+    };
+    rec.onend = () => {
+      if (contRec === rec) { contRec = null; }
+    };
+    rec.start();
+    armPhase(); // フェーズ0の聴き取り開始
+  }
+
+  // wrong後の手動リトライ（セッション再作成）
+  function retryListen() {
+    startContSession();
+  }
+
+  // ===== フェーズ制御 =====
   function advanceAuto() {
     const next = phase + 1;
     if (next > 2) {
+      // 全フェーズ完了
+      stopContSession();
       PLACES.forEach(pl => { $(pl.arrow).textContent = ''; $(pl.digit).classList.remove('active'); });
       $('mic').style.display = '';
       $('mic').textContent = '🎤 よむ';
@@ -415,23 +528,26 @@
       setTimeout(() => {
         $('result').textContent = '読まない ✓';
         $('result').className = 'result ok';
-        setTimeout(advanceAuto, 180);
-      }, 150);
+        setTimeout(advanceAuto, 150);
+      }, 120);
     } else {
       $('mic').style.display = '';
       $('yomanai').style.display = 'none';
-      setTimeout(startListen, 60);
+      armPhase(); // セッションは継続、このフェーズの受付だけ開始
     }
   }
 
   function onCorrect(said) {
+    stopGaugeTimer();
+    hideGauge();
     $('heard').textContent = said ? `きこえた：「${said}」` : '';
     $('result').textContent = '✓';
     $('result').className = 'result ok';
     playPhaseCorrect();
-    setTimeout(advanceAuto, 150);
+    setTimeout(advanceAuto, 80); // 150ms → 80ms に短縮
   }
   function onWrong(said) {
+    stopContSession(); // セッション停止、手動よむで再スタート
     $('heard').textContent = said ? `きこえた：「${said}」` : '';
     $('result').textContent = '× もういちど';
     $('result').className = 'result ng';
@@ -452,105 +568,7 @@
     renderCoins();
     setHint(false);
     startPhase(0);
-    // 百の位は常に1〜9なので即リスン開始
-    setTimeout(startListen, 80);
-  }
-
-  // ===== 音声入力 =====
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  function speakModel(n) {
-    if (!('speechSynthesis' in window)) return;
-    const u = new SpeechSynthesisUtterance(readingKana(n));
-    u.lang = 'ja-JP'; u.rate = 0.85;
-    speechSynthesis.cancel(); speechSynthesis.speak(u);
-  }
-
-  function rank(kind) { return { match:0, bara:1, wrong:2, unclear:3 }[kind]; }
-
-  function stripRepeats(text, kana) {
-    if (!kana) return text;
-    return text.replace(/\s/g, '').replace(new RegExp(kana, 'g'), '');
-  }
-
-  function isRepeatMatch(norm, kana) {
-    if (!kana || kana.length === 0) return false;
-    const stripped = stripRepeats(norm, kana);
-    // かなを除去して残りが短ければ繰り返し発話
-    return stripped.length === 0 || (norm.length >= kana.length && stripped.length <= 2);
-  }
-
-  function stopGaugeTimer() {
-    if (gaugeTimer) { clearTimeout(gaugeTimer); gaugeTimer = null; }
-  }
-  function finishListening() {
-    stopGaugeTimer();
-    hideGauge();
-    recognizing = false;
-    $('mic').disabled = false;
-    if ($('mic').textContent === '🎙 きいてるよ…') $('mic').textContent = '🎤 よむ';
-  }
-
-  function processAlternatives(alts, target) {
-    const kana = readingKana(target);
-    let best = null;
-    for (const a of alts) {
-      const norm = a.replace(/\s/g, '');
-      if (isRepeatMatch(norm, kana)) { best = { ok:true, kind:'match', said:a }; break; }
-      const v = judge(a, target);
-      if (!best || rank(v.kind) < rank(best.kind)) best = { ...v, said:a };
-      if (v.kind === 'match') break;
-    }
-    if (best && best.ok) onCorrect(best.said);
-    else onWrong(best ? best.said : '');
-  }
-
-  function startListen() {
-    if (!SR) { $('heard').textContent = 'このブラウザは音声に未対応（Chrome推奨）'; return; }
-    if (recognizing) return;
-    const target = placeValue(current, phase);
-    if (target === 0) return;
-
-    const rec = new SR();
-    currentRec = rec;
-    rec.lang = 'ja-JP';
-    rec.interimResults = false;  // 精度優先：最終結果のみ使用
-    rec.maxAlternatives = 3;
-    recognizing = true;
-
-    $('mic').textContent = '🎙 きいてるよ…';
-    $('mic').disabled = true;
-    $('result').textContent = '';
-    $('result').className = 'result';
-    $('heard').textContent = '';
-    showGauge(LISTEN_TIMEOUT_MS);
-
-    gaugeTimer = setTimeout(() => {
-      if (recognizing) {
-        try { rec.abort(); } catch(e) {}
-        hideGauge();
-        recognizing = false;
-        $('mic').textContent = '🎤 よむ';
-        $('mic').disabled = false;
-        $('heard').textContent = 'もう一度「よむ」を押してね';
-      }
-    }, LISTEN_TIMEOUT_MS);
-
-    rec.onresult = e => {
-      const alts = Array.from(e.results[0]).map(r => r.transcript);
-      finishListening();
-      processAlternatives(alts, target);
-    };
-
-    rec.onerror = () => {
-      finishListening();
-      $('heard').textContent = 'もう一度ためしてね';
-    };
-    rec.onend = () => {
-      if (recognizing) finishListening();
-    };
-
-    rec.start();
+    setTimeout(startContSession, 80); // 1問1セッション開始
   }
 
   // ===== スタートボタン =====
@@ -560,7 +578,7 @@
     newProblem();
   });
 
-  $('mic').addEventListener('click', startListen);
+  $('mic').addEventListener('click', retryListen);
   $('yomanai').addEventListener('click', () => {
     $('result').textContent = '読まない ✓';
     $('result').className = 'result ok';
